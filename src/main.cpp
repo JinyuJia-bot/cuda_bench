@@ -52,6 +52,10 @@ static void run_case(int M, int N, int K, int iters) {
     CHECK_CUDA(cudaMalloc(&dC_reg4x4, bytesC));
     CHECK_CUDA(cudaMemcpy(dC_reg4x4, hC0.data(), bytesC, cudaMemcpyHostToDevice));
 
+    float *dC_vecload = nullptr;
+    CHECK_CUDA(cudaMalloc(&dC_vecload, bytesC));
+    CHECK_CUDA(cudaMemcpy(dC_vecload, hC0.data(), bytesC, cudaMemcpyHostToDevice));
+
     float *dC_cublas = nullptr;
     CHECK_CUDA(cudaMalloc(&dC_cublas, bytesC));
     CHECK_CUDA(cudaMemcpy(dC_cublas, hC0.data(), bytesC, cudaMemcpyHostToDevice));
@@ -69,10 +73,15 @@ static void run_case(int M, int N, int K, int iters) {
     float shared_ms = time_cuda_events(shared_call, iters);
 
     auto reg4x4_call = [&]() {
-        gemm_reg4x4_rowmajor(dA, dB, dC_shared, desc);
+        gemm_reg4x4_rowmajor(dA, dB, dC_reg4x4, desc);
     };
     float reg4x4_ms = time_cuda_events(reg4x4_call, iters);
 
+    auto vecload_call = [&]() {
+        gemm_vecload_rowmajor(dA, dB, dC_vecload, desc);
+    };
+    float vecload_ms = time_cuda_events(vecload_call, iters);
+    
     cublasHandle_t handle;
     CHECK_CUBLAS(cublasCreate(&handle));
     // CHECK_CUBLAS(cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH)); // 可选： TF32 开关 （先建议关掉验证 diff）
@@ -92,34 +101,42 @@ static void run_case(int M, int N, int K, int iters) {
     std::vector<float> hC_reg4x4((size_t)M*N);
     CHECK_CUDA(cudaMemcpy(hC_reg4x4.data(), dC_reg4x4, bytesC, cudaMemcpyDeviceToHost));
 
+    std::vector<float> hC_vecload((size_t)M*N);
+    CHECK_CUDA(cudaMemcpy(hC_vecload.data(), dC_vecload, bytesC, cudaMemcpyDeviceToHost));
+
     std::vector<float> hC_cublas((size_t)M*N);
     CHECK_CUDA(cudaMemcpy(hC_cublas.data(), dC_cublas, bytesC, cudaMemcpyDeviceToHost));
     
     float diff_naive = max_abs_diff(hC_naive, hC_cublas);
     float diff_shared = max_abs_diff(hC_shared, hC_cublas);
     float diff_reg4x4 = max_abs_diff(hC_reg4x4, hC_cublas);
+    float diff_vecload = max_abs_diff(hC_vecload, hC_cublas);
 
     // --- Report ---
     // Flops for GEMM: 2*M*N*K
     double flops = 2.0 * (double)M * (double)N * (double)K;
     double naive_t = naive_ms * 1e-3;
     double shared_t = shared_ms * 1e-3;
-    double reg4x4_t = reg4x4_ms * 1e-3; 
+    double reg4x4_t = reg4x4_ms * 1e-3;
+    double vecload_t = vecload_ms * 1e-3;
     double cublas_t = cublas_ms * 1e-3;
     
     double naive_gflops = flops / naive_t / 1e9;
     double shared_gflops = flops / shared_t / 1e9;
     double reg4x4_gflops = flops / reg4x4_t / 1e9;
+    double vecload_gflops = flops / vecload_t / 1e9;
     double cublas_gflops = flops / cublas_t / 1e9;
 
     printf("naive   : %.3f ms, %.2f GFLOP/s\n", naive_ms, naive_gflops);
     printf("shared  : %.3f ms, %.2f GFLOP/s\n", shared_ms, shared_gflops);
     printf("reg4x4  : %.3f ms, %.2f GFLOP/s\n", reg4x4_ms, reg4x4_gflops);
+    printf("vecload : %.3f ms, %.2f GFLOP/s\n", vecload_ms, vecload_gflops);
     printf("cuBLAS  : %.3f ms, %.2f GFLOP/s\n", cublas_ms, cublas_gflops);
     
     printf("max|diff|: naive  vs cuBLAS: %.6g\n", diff_naive);
     printf("max|diff|: shared vs cuBLAS: %.6g\n", diff_shared);
-    printf("max|diff|: shared vs cuBLAS: %.6g\n", diff_shared);
+    printf("max|diff|: reg4x4 vs cuBLAS: %.6g\n", diff_reg4x4);
+    printf("max|diff|: vecload vs cuBLAS: %.6g\n", diff_vecload);
 
     CHECK_CUDA(cudaFree(dA));
     CHECK_CUDA(cudaFree(dB));
@@ -127,6 +144,7 @@ static void run_case(int M, int N, int K, int iters) {
     CHECK_CUDA(cudaFree(dC_cublas));
     CHECK_CUDA(cudaFree(dC_shared));
     CHECK_CUDA(cudaFree(dC_reg4x4));
+    CHECK_CUDA(cudaFree(dC_vecload));
 }
 
 int main() {

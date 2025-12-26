@@ -5,7 +5,7 @@
 #define BN 16
 #define TM 4
 #define TN 4
-#define BK 64
+#define BK 16
 
 
 __global__ void gemm_reg4x4_rm_kernel(const float* __restrict__ A,

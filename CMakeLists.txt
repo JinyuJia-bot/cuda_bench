@@ -42,6 +42,15 @@ target_compile_options(gemm_reg4x4 PRIVATE
 )
 set_target_properties(gemm_shared PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
+# lib vecload
+add_library(gemm_vecload STATIC
+    src/vecload_gemm.cu)
+target_include_directories(gemm_vecload PUBLIC include)
+target_compile_options(gemm_vecload PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>
+)
+set_target_properties(gemm_vecload PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
 # lib cublas
 add_library(gemm_cublas STATIC
     src/cublas_gemm.cu)
@@ -54,7 +63,7 @@ add_executable(bench_gemm
     src/main.cpp
 )
 target_include_directories(bench_gemm PRIVATE include)
-target_link_libraries(bench_gemm PRIVATE gemm_naive gemm_cublas gemm_shared gemm_reg4x4 CUDA::cudart)
+target_link_libraries(bench_gemm PRIVATE gemm_naive gemm_cublas gemm_shared gemm_reg4x4 gemm_vecload CUDA::cudart)
 
 # 常见优化
 target_compile_options(bench_gemm PRIVATE

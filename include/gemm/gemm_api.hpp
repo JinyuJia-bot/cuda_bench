@@ -14,4 +14,6 @@ void gemm_shared_rowmajor(const float* dA, const float* dB, float* dC, const Gem
 
 void gemm_reg4x4_rowmajor(const float* dA, const float* dB, float* dC, const GemmDesc& d);
 
+void gemm_vecload_rowmajor(const float* dA, const float* dB, float* dC, const GemmDesc& d);
+
 void gemm_cublas_rowmajor(cublasHandle_t handle, const float* dA, const float* dB, float* dC, const GemmDesc& d);
