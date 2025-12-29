@@ -2,7 +2,7 @@
 #include "common/cuda_check.hpp"
 #include <functional>
 
-inline float time_cuda_events(const std::function<void()>& fn, int iters, int warmup=5) {
+inline float time_cuda_events(const std::function<void()>& fn, int iters, int warmup=1) {
     for (int i = 0; i < warmup; i++) fn();
     CHECK_CUDA(cudaDeviceSynchronize());
 
